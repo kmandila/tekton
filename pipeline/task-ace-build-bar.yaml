@@ -5,11 +5,11 @@ metadata:
 spec:
   params:
     - name: barNameWithoutExtension
-      default: generatedBarFile
+      default: test
       description: The name of the bar to be built, without the .bar extension
       type: string
     - name: barVersion
-      default: '69'
+      default: '01'
       description: The version of the bar to be built, without the .bar extension - will be appended to bar name
       type: string
     - name: aceToolkitCodeDirectory
@@ -17,10 +17,10 @@ spec:
       description: The base directory containing ACE projects
       type: string
   steps:
-    - image: 'image-registry.openshift-image-registry.svc:5000/ace-demo/ace-with-zip'
+    - image: 'image-registry.openshift-image-registry.svc:5000/ace1/tekton'
       name: run-ibm-int
       securityContext:
-        runAsUser: 1001
+        runAsUser: 1000
       env:
           - name: BAR_NAME_WITHOUT_EXTENSION
             value: $(params.barNameWithoutExtension)
@@ -34,7 +34,7 @@ spec:
 
         echo "========== Setting mqsiprofile - environment for ACE commands =========="
 
-        source /opt/ibm/ace-12/server/bin/mqsiprofile
+        source /opt/ibm/ace-12.0.2.0/server/bin/mqsiprofile
 
         echo "========== Building a bar file =========="
 
