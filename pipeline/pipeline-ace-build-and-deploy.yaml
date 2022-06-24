@@ -6,7 +6,7 @@ spec:
   params:
     - name: git-url
       description: The git repository URL to clone from
-      default: 'https://github.com/preethiram4/ACE_Tekton_Operators.git'
+      default: 'https://github.com/preethiram4/tekton.git'
       type: string
     - name: git-revision
       description: Revision to checkout. (branch, tag, sha, ref, etc...)
