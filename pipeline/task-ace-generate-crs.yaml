@@ -9,7 +9,7 @@ spec:
       description: The name of the integration server which will be deployed - will be used in Openshift deployment artefacts
       type: string
     - name: deploymentNamespace
-      default: ace
+      default: ace1
       description: The name of the Openshift namespace/project , where the integration server and configuration will be deployed
       type: string
     - name: nexusServerBaseURL
@@ -33,8 +33,10 @@ spec:
       default: ''
       type: string
   steps:
-    - image: 'image-registry.openshift-image-registry.svc:5000/ace-demo/ace-with-zip'
+    - image: 'image-registry.openshift-image-registry.svc:5000/ace1/tekton:latest'
       name: generate-crs
+      securityContext:
+        runAsUser: 1000
       env:
           - name: INTEGRATION_SERVER_NAME
             value: $(params.integrationServerName)
