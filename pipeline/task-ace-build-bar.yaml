@@ -34,7 +34,7 @@ spec:
 
         echo "========== Setting mqsiprofile - environment for ACE commands =========="
 
-        source /opt/ibm/ace-12.0.2.0/server/bin/mqsiprofile
+        source /opt/ibm/ace-12/server/bin/mqsiprofile
 
         echo "========== Building a bar file =========="
 
