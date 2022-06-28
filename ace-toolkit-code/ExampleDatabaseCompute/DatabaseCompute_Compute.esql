@@ -1,4 +1,4 @@
-
+#comment#
 
 CREATE COMPUTE MODULE DatabaseCompute_Compute
 	CREATE FUNCTION Main() RETURNS BOOLEAN
