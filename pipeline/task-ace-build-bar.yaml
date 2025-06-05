@@ -17,10 +17,10 @@ spec:
       description: The base directory containing ACE projects
       type: string
   steps:
-    - image: 'image-registry.openshift-image-registry.svc:5000/ace1/tekton'
+    - image: 'image-registry.openshift-image-registry.svc:5000/ssaqc-uat/tekton'
       name: run-ibm-int
       securityContext:
-        runAsUser: 1000
+        runAsUser: 0
       env:
           - name: BAR_NAME_WITHOUT_EXTENSION
             value: $(params.barNameWithoutExtension)
@@ -28,6 +28,8 @@ spec:
             value: $(params.barVersion)
           - name: ACE_TOOLKIT_CODE_DIRECTORY
             value: $(params.aceToolkitCodeDirectory)
+          - name: LICENSE
+            value: accept
       resources: {}
       script: >
         #!/bin/bash
