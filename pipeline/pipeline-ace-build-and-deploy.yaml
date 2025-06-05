@@ -6,7 +6,7 @@ spec:
   params:
     - name: git-url
       description: The git repository URL to clone from
-      default: 'https://github.com/preethiram4/tekton.git'
+      default: 'https://github.com/kmandila/tekton.git'
       type: string
     - name: git-revision
       description: Revision to checkout. (branch, tag, sha, ref, etc...)
@@ -34,7 +34,7 @@ spec:
       type: string
     - name: nexus-server-base-url
       description: The Base URL of the Nexus server where the bar file will be uploaded
-      default: http://nexus-ace.apps.pn1.aws.ztech.spatnam.in
+      default: https://nexus-route-ci.cpqc-stg-ff345f2e2c2dee8e6c4a23bde3ab8a9a-0000.us-south.containers.appdomain.cloud
       type: string
     - name: nexus-repository-name
       description: The name of the Nexus repository, where the bar file will be uploaded
@@ -49,8 +49,8 @@ spec:
       default: admin
       type: string
     - name: nexus-upload-user-password
-      description: The Nexus user's password (default for Nexus is "admin123")
-      default: admin123
+      description: The Nexus user's password
+      default: b57db9d6-eda6-4217-ba0a-c71301b768a0
       type: string
   tasks:
     - name: fetch-from-git
