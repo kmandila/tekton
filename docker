@@ -1,4 +1,4 @@
-FROM cp.icr.io/cp/appc/ace-server-prod@sha256:7eb8483de45c1634d09e24521b9d2f89a9e4d0c9b89a1a5d52cc4fd37a091234
+FROM cp.icr.io/cp/appc/ace:12.0.12.12-r1@sha256:741d46bc6739d8689ffda6d11fac877cca64b84d7027779148902ebb247bde81
 USER root
 RUN echo $PWD
 EXPOSE 7600 7800 7843 9483
