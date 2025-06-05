@@ -1,0 +1,9 @@
+apiVersion: appconnect.ibm.com/v1beta1
+kind: Configuration
+metadata:
+  namespace: replace-with-namespace
+  name: replace-with-odbcini-name
+spec:
+  data: replace-with-odbcini-base64
+  secretName: IVO_k82_secret_name-may_be_optional
+  type: odbc
