@@ -64,13 +64,13 @@ spec:
         name: ace-git-clone
       workspaces:
         - name: output
-          workspace: git-source
+          workspace: 
 #        - name: ssh-directory
-#          workspace: git-source
+#          workspace: 
 #        - name: ssl-ca-directory
-#          workspace: git-source
+#          workspace: 
 #        - name: basic-auth
-#          workspace: git-source
+#          workspace: 
     - name: ace-build-bar
       params:
         - name: barNameWithoutExtension
@@ -86,7 +86,7 @@ spec:
         name: ace-build-bar
       workspaces:
         - name: output
-          workspace: git-source
+          workspace: 
     - name: ace-generate-crs
       params:
         - name: integrationServerName
@@ -110,7 +110,7 @@ spec:
         name: ace-generate-crs
       workspaces:
         - name: output
-          workspace: git-source
+          workspace: 
     - name: ace-nexus-upload-bar
       params:
         - name: nexusServerBaseURL
@@ -134,7 +134,7 @@ spec:
         name: ace-nexus-upload-bar
       workspaces:
         - name: output
-          workspace: git-source
+          workspace: 
     - name: ace-deploy-crs
       runAfter:
         - ace-generate-crs
@@ -144,6 +144,6 @@ spec:
         name: ace-deploy-crs
       workspaces:
         - name: output
-          workspace: git-source
+          workspace: 
   workspaces:
-    - name: git-source
+    - name: pipeline-shared-workspace
