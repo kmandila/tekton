@@ -1,0 +1,8 @@
+apiVersion: appconnect.ibm.com/v1beta1
+kind: Configuration
+metadata:
+  namespace: replace-with-namespace
+  name: replace-with-barauth-name
+spec:
+  data: replace-with-barauth-base64
+  type: barauth
