@@ -1,0 +1,99 @@
+
+CREATE COMPUTE MODULE casedata_extract_ProcessCongaErrors
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+
+		SET Environment.Variables.RequestIdentifier = InputLocalEnvironment.Destination.HTTP.RequestIdentifier;
+
+
+		DECLARE payload CHARACTER;
+
+		IF Environment.Variables.Auth.Conga IS NULL THEN
+
+			SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';
+			SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/x-www-form-urlencoded';
+			SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'GET';
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = 'https://test.salesforce.com/services/oauth2/token';
+
+			SET payload = 'grant_type=password&username=gssapcqa@us.ibm.com&client_secret=904DB694F1781E747ED130904165094040EBE17321A0FB7F6687507598424BF7&client_id=3MVG9sVI3Fa3A7wCoOLmrCPnxUFoPOX_Vvyn_eg3.iRQR1Rp3FC7EnKvKNI.LvKK8YakE0ePvJay5K29sErlZ&password='||CongaPassword;
+			SET OutputRoot.BLOB.BLOB = CAST(payload AS BLOB CCSID 1208 ENCODING 815);
+			PROPAGATE TO TERMINAL 'out1';
+
+
+		END IF;
+
+		DECLARE _objectURI CHAR Environment.Variables.Auth.Conga_instance_url; --URL of the instance
+		--associated with the given SFDC account
+		DECLARE _oauthToken CHAR Environment.Variables.Auth.Conga; --access token to unlock
+		--the associated instance
+		SET _objectURI = _objectURI ||'/services/data/v54.0/query/?q=SELECT+Id+FROM+Apttus_Config2__LineItem__c+WHERE Apttus_Config2__ConfigurationId__c='||''''||Environment.Variables.queryParams.productConfigId||''''||' AND APTS_Integration_Type__c='||'''GPE Extract''';
+		-- Setting HTTP params dynamically
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		SET OutputRoot.HTTPRequestHeader."Authorization" = 'Bearer ' || _oauthToken;
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'GET';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = _objectURI;
+
+		PROPAGATE TO TERMINAL 'out1';
+
+		IF EXISTS(Environment.Variables.Data.deleteLines.records.Item[]) THEN
+			
+			DECLARE i INT 1;
+			DECLARE Ids INTEGER CARDINALITY(Environment.Variables.Data.deleteLines.records.Item[]);
+
+			WHILE i <= Ids DO
+
+				IF i = 1 THEN
+					SET OutputLocalEnvironment.Variables.Data.Ids = Environment.Variables.Data.deleteLines.records.Item[i].Id || ',';
+				ELSEIF i = Ids THEN
+					SET OutputLocalEnvironment.Variables.Data.Ids = OutputLocalEnvironment.Variables.Data.Ids || Environment.Variables.Data.deleteLines.records.Item[i].Id;
+
+				ELSE
+					SET OutputLocalEnvironment.Variables.Data.Ids = OutputLocalEnvironment.Variables.Data.Ids || Environment.Variables.Data.deleteLines.records.Item[i].Id ||',';
+				END IF;
+
+				SET i = i + 1;
+			END WHILE;
+
+
+			DECLARE _objectURI CHAR Environment.Variables.Auth.Conga_instance_url; --URL of the instance
+			--associated with the given SFDC account
+			DECLARE _oauthToken CHAR Environment.Variables.Auth.Conga; --access token to unlock
+			--the associated instance
+			SET _objectURI = _objectURI ||'/services/data/v54.0/composite/sobjects?ids='||OutputLocalEnvironment.Variables.Data.Ids||'&allOrNone=false';
+			-- Setting HTTP params dynamically
+			SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+			SET OutputRoot.HTTPRequestHeader."Authorization" = 'Bearer ' || _oauthToken;
+			SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'DELETE';
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = _objectURI;
+			PROPAGATE TO TERMINAL 'out1';
+
+		END IF;
+
+		CALL CopyMessageHeaders();
+
+		SET OutputLocalEnvironment.Destination.HTTP.RequestIdentifier = Environment.Variables.RequestIdentifier;
+		SET OutputRoot.JSON.Data = null;
+		SET OutputRoot.JSON.Data.CaseUId = Environment.Variables.queryParams.caseUId;
+		SET OutputRoot.JSON.Data.CaseExtractStatus='Failure';
+		SET OutputRoot.JSON.Data.CaseExtractMessage='SDM GPE Sync Failed in App Connect';
+
+		RETURN TRUE;
+
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

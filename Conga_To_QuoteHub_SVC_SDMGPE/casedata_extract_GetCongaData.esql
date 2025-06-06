@@ -1,0 +1,69 @@
+DECLARE CongaURL, CongaPassword EXTERNAL CHARACTER;
+
+CREATE COMPUTE MODULE casedata_extract_GetCongaData
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		
+		-- Loop through the input message and Filter lines with null level40_offering_cd
+		SET OutputLocalEnvironment.Variables.FilteredLines.Item[] =
+		(SELECT I FROM InputRoot.JSON.Data.Item[] AS I
+		WHERE I.level40_offering_cd IS null
+		);
+
+		DECLARE icounter Integer;
+		SET icounter = CARDINALITY(OutputLocalEnvironment.Variables.FilteredLines.Item[]);
+
+		IF icounter > 1 THEN
+			THROW USER EXCEPTION CATALOG 'MyCatalog' MESSAGE 1234 VALUES
+			('level40_offering_cd is null for Component Line Id' || OutputLocalEnvironment.Variables.FilteredLines.Item[1].comp_id);
+		END IF;
+		
+		
+		SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/x-www-form-urlencoded';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = CongaURL||'/services/oauth2/token';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'POST';
+
+		DECLARE payload CHARACTER;
+		SET payload = 'grant_type=password&username=gssapcqa@us.ibm.com&client_secret=904DB694F1781E747ED130904165094040EBE17321A0FB7F6687507598424BF7&client_id=3MVG9sVI3Fa3A7wCoOLmrCPnxUFoPOX_Vvyn_eg3.iRQR1Rp3FC7EnKvKNI.LvKK8YakE0ePvJay5K29sErlZ&password='||CongaPassword;
+		SET OutputRoot.BLOB.BLOB = CAST(payload AS BLOB CCSID 1208 ENCODING 815);		
+		
+		PROPAGATE TO TERMINAL 'out1';
+
+		-- Setting HTTP params dynamically
+		SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'GET';
+		SET OutputRoot.HTTPRequestHeader."Authorization" = 'Bearer ' || Environment.Variables.Auth.Conga;
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = Environment.Variables.Auth.Conga_instance_url || '/services/data/v54.0/query/?q=SELECT Id,Name,APTS_L40_Search__c FROM Product2 WHERE IsActive=TRUE AND IBM_GPE_Product__c=TRUE';
+		
+		PROPAGATE TO TERMINAL 'out1';
+		
+        -- Setting HTTP params dynamically
+		SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';        
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'GET';
+		SET OutputRoot.HTTPRequestHeader."Authorization" = 'Bearer ' || Environment.Variables.Auth.Conga;
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = Environment.Variables.Auth.Conga_instance_url || '/services/data/v54.0/query/?q=SELECT APTS_Max_Line_Number__c,CurrencyIsoCode FROM apttus_config2__productconfiguration__c WHERE Id='||''''||Environment.Variables.queryParams.productConfigId||'''';
+		
+		PROPAGATE TO TERMINAL 'out1';		
+		
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

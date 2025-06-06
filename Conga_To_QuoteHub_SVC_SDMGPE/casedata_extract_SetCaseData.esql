@@ -1,0 +1,39 @@
+
+
+CREATE COMPUTE MODULE casedata_extract_GetCaseData
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+
+		CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+
+		
+		SET Environment.Variables.Auth.SO2OHub = InputRoot.JSON.Data.bearerTokenDetails.bearerToken;
+		SET OutputRoot.HTTPRequestHeader.Authorization = 'Bearer ' || InputRoot.JSON.Data.bearerTokenDetails.bearerToken;
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		
+		SET OutputRoot.JSON.Data.filterListModeAnd = True;
+		CREATE FIELD OutputRoot.JSON.Data.searchCaseInfoFilterDCList IDENTITY(JSON.Array)searchCaseInfoFilterDCList;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].enteredOppNum = Environment.Variables.queryParams.opportunityId;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].caseUid = Environment.Variables.queryParams.caseUId;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].filterModeAnd = true;
+		SET OutputRoot.JSON.Data.applicationCode = 'APTTUS';
+		SET OutputRoot.JSON.Data.userId = 'gssapcqa@us.ibm.com';
+		
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

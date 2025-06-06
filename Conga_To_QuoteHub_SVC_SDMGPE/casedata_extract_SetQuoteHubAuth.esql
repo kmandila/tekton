@@ -1,0 +1,89 @@
+DECLARE QuoteHubPassword EXTERNAL CHARACTER;
+
+CREATE COMPUTE MODULE casedata_extract_GetQuoteHubAuth
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		
+		SET Environment.Variables.queryParams = InputLocalEnvironment.REST.Input.Parameters;
+
+		SET OutputRoot.HTTPRequestHeader."X-IBM-Client-Id" = 'fac74d6924179a2c5f4bf067ca482e14';
+		SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/x-www-form-urlencoded';
+	
+		SET OutputLocalEnvironment.Destination.HTTP.RequestURL = 'https://dev.api.ibm.com/q2chub/bluetest/auth/functional';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'POST';
+
+		DECLARE payload CHARACTER;
+		SET payload = 'userId=gssapcqa@us.ibm.com&poseAsUserId=gssapcqa@us.ibm.com&clientApplicationId=40&useFunctionalIdAccessRights=true&password='||QuoteHubPassword;
+		SET OutputRoot.BLOB.BLOB = CAST(payload AS BLOB CCSID 1208 ENCODING 815);
+
+		PROPAGATE TO TERMINAL 'out1';
+		
+		SET OutputRoot.HTTPRequestHeader."X-IBM-Client-Id" = 'fac74d6924179a2c5f4bf067ca482e14';		
+		SET OutputRoot.HTTPRequestHeader.Authorization = 'Bearer ' || Environment.Variables.Auth.SO2OHub;
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		
+	    SET OutputLocalEnvironment.Destination.HTTP.RequestURL = 'https://dev.api.ibm.com/q2chub/bluetest/so2o/rest/lscr/case/search';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'POST';
+		
+		SET OutputRoot.JSON.Data.filterListModeAnd = True;
+		CREATE FIELD OutputRoot.JSON.Data.searchCaseInfoFilterDCList IDENTITY(JSON.Array)searchCaseInfoFilterDCList;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].enteredOppNum = Environment.Variables.queryParams.opportunityId;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].caseUid = Environment.Variables.queryParams.caseUId;
+		SET OutputRoot.JSON.Data.searchCaseInfoFilterDCList.Item[1].filterModeAnd = true;
+		SET OutputRoot.JSON.Data.applicationCode = 'APTTUS';
+		SET OutputRoot.JSON.Data.userId = 'gssapcqa@us.ibm.com';
+		
+		PROPAGATE TO TERMINAL 'out1';
+		
+        SET OutputRoot.HTTPRequestHeader."X-IBM-Client-Id" = 'fac74d6924179a2c5f4bf067ca482e14';
+		SET OutputRoot.HTTPRequestHeader.Authorization = 'Bearer ' || Environment.Variables.Auth.SO2OHub;
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		
+	    SET OutputLocalEnvironment.Destination.HTTP.RequestURL = 'https://dev.api.ibm.com/q2chub/bluetest/so2o/rest/lscr/case/header/retrieve';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'POST';
+		
+	    
+		SET OutputRoot.JSON.Data.fullInfo = True;
+	    SET OutputRoot.JSON.Data.caseUid = Environment.Variables.queryParams.caseUId;	
+		SET OutputRoot.JSON.Data.applicationCode = 'APTTUS';
+		SET OutputRoot.JSON.Data.userId = 'gssapcqa@us.ibm.com';
+		SET OutputRoot.JSON.Data.userCNum = 'C-NCHV897';
+		
+		PROPAGATE TO TERMINAL 'out1';
+
+	    SET OutputRoot.HTTPRequestHeader."X-IBM-Client-Id" = 'fac74d6924179a2c5f4bf067ca482e14';
+	    SET OutputRoot.HTTPRequestHeader.Authorization = 'Bearer ' || Environment.Variables.Auth.SO2OHub;
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		
+	    SET OutputLocalEnvironment.Destination.HTTP.RequestURL = 'https://dev.api.ibm.com/q2chub/bluetest/repositories/3000/versions/4/JSON';
+		SET OutputLocalEnvironment.Destination.HTTP.RequestLine.Method = 'POST';
+	    
+		SET OutputRoot.JSON.Data.separator = ';';
+		CREATE FIELD OutputRoot.JSON.Data.inputParameterList IDENTITY(JSON.Array)inputParameterList;
+		SET OutputRoot.JSON.Data.inputParameterList.Item[1].name = 'CASEUID';
+		-- Null L40OfferingCode	
+		--	SET OutputRoot.JSON.Data.inputParameterList.Item[1].value = '134761';
+	    SET OutputRoot.JSON.Data.inputParameterList.Item[1].value = Environment.Variables.queryParams.caseUId;
+	    
+	    PROPAGATE TO TERMINAL 'out1';
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

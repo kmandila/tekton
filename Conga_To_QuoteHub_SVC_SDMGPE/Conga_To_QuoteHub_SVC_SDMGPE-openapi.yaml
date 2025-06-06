@@ -1,0 +1,75 @@
+---
+swagger: "2.0"
+info:
+  title: "Conga_To_QuoteHub_SVC_SDMGPE"
+  version: "1.0.0"
+  description: ""
+basePath: "/Conga_To_QuoteHub_SVC_SDMGPE"
+paths:
+  /casedata/extract:
+    get:
+      tags:
+      - "casedata"
+      summary: "Get Security Services GPE Case Data from QuoteHub."
+      operationId: "casedata.extract"
+      parameters:
+      - name: "opportunityId"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "caseUId"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "proposalId"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "productConfigId"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "productConfigName"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "priceListId"
+        in: "query"
+        type: "string"
+        required: false
+      - name: "quoteId"
+        in: "query"
+        type: "string"
+        required: false
+      responses:
+        "200":
+          description: "Request was successful"
+          schema:
+            $ref: "#/definitions/casedata"
+      deprecated: false
+      security:
+      - basicAuth: []
+tags:
+- name: "casedata"
+host: "ssaqc-uat-designer-designer-https-ssaqc-uat.cpqc-stg-ff345f2e2c2dee8e6c4a23bde3ab8a9a-0000.us-south.containers.appdomain.cloud"
+schemes:
+- "https"
+consumes:
+- "application/json"
+produces:
+- "application/json"
+definitions:
+  casedata:
+    properties:
+      CaseUId:
+        type: "string"
+      CaseExtractStatus:
+        type: "string"
+      CaseExtractMessage:
+        type: "string"
+    required:
+    - "CaseUId"
+    additionalProperties: false
+securityDefinitions:
+  basicAuth:
+    type: "basic"

@@ -1,0 +1,33 @@
+CREATE COMPUTE MODULE casedata_extract_GetLinesData
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+
+		CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		
+	    SET Environment.Variables.Data.Header = InputRoot.JSON.Data;
+	    
+		SET OutputRoot.JSON.Data.separator = ';';
+		CREATE FIELD OutputRoot.JSON.Data.inputParameterList IDENTITY(JSON.Array)inputParameterList;
+		SET OutputRoot.JSON.Data.inputParameterList.Item[1].name = 'CASEUID';
+		-- Null L40OfferingCode	
+		--	SET OutputRoot.JSON.Data.inputParameterList.Item[1].value = '134761';
+	    SET OutputRoot.JSON.Data.inputParameterList.Item[1].value = Environment.Variables.queryParams.caseUId;
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

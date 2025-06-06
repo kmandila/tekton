@@ -1,0 +1,46 @@
+
+
+
+CREATE COMPUTE MODULE casedata_extract_GetQuoteHubData
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+
+		IF ENDSWITH(InputLocalEnvironment.Destination.HTTP.RequestURL, 'auth/functional') THEN
+			SET Environment.Variables.Auth.SO2OHub = InputRoot.JSON.Data.bearerTokenDetails.bearerToken;
+		ELSEIF ENDSWITH(InputLocalEnvironment.Destination.HTTP.RequestURL, 'case/search') THEN
+			IF InputRoot.JSON.Data.searchCaseInfoResponse.totalSearchResultCount > 0 THEN
+				SET Environment.Variables.Data.SearchCase = InputRoot.JSON.Data;
+			ELSE
+				THROW USER EXCEPTION CATALOG 'MyCatalog' MESSAGE 1234 VALUES ('No Case Found in QuoteHub For Case UId: '|| Environment.Variables.queryParams.caseUId || 'and Opportunity Id: '|| Environment.Variables.queryParams.opportunityId);
+			END IF;
+		ELSEIF ENDSWITH(InputLocalEnvironment.Destination.HTTP.RequestURL, 'case/header/retrieve') THEN
+			SET Environment.Variables.Data.Header = InputRoot.JSON.Data;
+		ELSEIF ENDSWITH(InputLocalEnvironment.Destination.HTTP.RequestURL, '/versions/4/JSON') THEN
+			IF EXISTS(InputRoot.JSON.Data.Item[]) THEN
+				SET Environment.Variables.Data.Lines = InputRoot.JSON.Data;
+			ELSE
+				THROW USER EXCEPTION CATALOG 'MyCatalog' MESSAGE 1234 VALUES ('No Case Found in QuoteHub For Case UId: '|| Environment.Variables.queryParams.caseUId || 'and Opportunity Id: '|| Environment.Variables.queryParams.opportunityId);
+			END IF;
+		END IF;
+
+
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

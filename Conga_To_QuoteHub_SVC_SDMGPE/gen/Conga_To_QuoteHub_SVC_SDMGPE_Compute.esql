@@ -1,0 +1,33 @@
+
+
+BROKER SCHEMA gen
+
+
+CREATE COMPUTE MODULE Conga_To_QuoteHub_SVC_SDMGPE_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		 CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		
+		SET OutputLocalEnvironment.Destination.Salesforce.Request.operation = 'retrieve';
+		SET OutputLocalEnvironment.Destination.Salesforce.Request.object = 'Product2';
+		SET OutputLocalEnvironment.Destination.Salesforce.Request.filter.where = 'IsActive=TRUE+AND+IBM_GPE_Product__c=TRUE';
+
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

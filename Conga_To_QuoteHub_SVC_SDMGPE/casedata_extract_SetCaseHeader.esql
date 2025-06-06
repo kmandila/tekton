@@ -1,0 +1,33 @@
+
+
+CREATE COMPUTE MODULE casedata_extract_GetCaseHeader
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+
+		CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+	    SET Environment.Variables.Data.SearchCase = InputRoot.JSON.Data;
+	    
+		SET OutputRoot.JSON.Data.fullInfo = True;
+	    SET OutputRoot.JSON.Data.caseUid = Environment.Variables.queryParams.caseUId;	
+		SET OutputRoot.JSON.Data.applicationCode = 'APTTUS';
+		SET OutputRoot.JSON.Data.userId = 'gssapcqa@us.ibm.com';
+		SET OutputRoot.JSON.Data.userCNum = 'C-NCHV897';
+		
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

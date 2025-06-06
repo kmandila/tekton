@@ -1,0 +1,266 @@
+
+
+CREATE COMPUTE MODULE casedata_extract_CreateLinesInConga
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		   CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+        SET Environment.Variables.Data.ProductConfig = InputRoot.JSON.Data.records;
+	--	SET Environment.Variables.Data.PriceListItem = InputRoot.JSON.Data;
+		--URL of the instance associated with the given SFDC account
+		DECLARE _instanceURL CHAR Environment.Variables.Auth.Conga_instance_url;
+		DECLARE _objectURI CHAR;
+		-- SET _objectURI = _objectURI || '/services/data/v54.0/sobjects/Apttus_Config2__LineItem__c';
+		--access token to unlock the associated instance
+		DECLARE _oauthToken CHAR Environment.Variables.Auth.Conga;
+		SET OutputRoot.HTTPRequestHeader."Content-Type" = 'application/json';
+		SET OutputRoot.HTTPRequestHeader.Accept = 'application/json';
+		SET OutputRoot.HTTPRequestHeader."Authorization" = 'Bearer ' || _oauthToken;
+	--	SET OutputLocalEnvironment.Destination.HTTP.RequestURL = _objectURI;
+		-- Declare and Set dynamic references
+		DECLARE myref REFERENCE TO Environment.Variables.Data.Lines.Item[1];
+		-- CREATE FIELD OutputRoot.JSON.Data IDENTITY (JSON.Array)Data;
+		CREATE FIELD OutputRoot.JSON.Data;
+		DECLARE outref REFERENCE TO OutputRoot.JSON;
+		DECLARE i INTEGER 1;
+		DECLARE APTS_Max_Line_Number__c INTEGER;
+		DECLARE FieldExists BOOLEAN;
+		DECLARE diffInDays INTEGER;
+		DECLARE DurationInMonths INTEGER;
+
+
+		FOR source AS Environment.Variables.Data.Lines.Item[] DO
+						
+			-- Loop through Product2 Object and Filter matching level40_offering_cd
+			SET OutputLocalEnvironment.Variables.FilteredLine.Item[] =
+			(SELECT I FROM Environment.Variables.Data.Product2.records."Item"[] AS I
+			WHERE CONTAINS(I.APTS_L40_Search__c, source.level40_offering_cd)
+			);
+
+			SET FieldExists = EXISTS(OutputLocalEnvironment.Variables.FilteredLine.Item[]);
+			SET OutputLocalEnvironment.Variables.FieldExists = FieldExists;
+
+			IF FieldExists IS FALSE THEN
+				THROW USER EXCEPTION CATALOG 'MyCatalog' MESSAGE 1234 VALUES
+				('level40_offering_cd Not Found in Conga for QuoteHub comp_id: ' || source.comp_id);
+			END IF;
+			
+		--	GetPriceListItem
+		--  Setting HTTP params dynamically
+			SET _objectURI = _instanceURL || '/services/data/v54.0/query/?q=SELECT Id FROM Apttus_Config2__PriceListItem__c WHERE (Apttus_Config2__PriceListItem__c.Apttus_Config2__PriceListId__c='||''''||Environment.Variables.queryParams.priceListId||''''||') AND (Apttus_Config2__PriceListItem__c.Apttus_Config2__ProductId__c='||''''||OutputLocalEnvironment.Variables.FilteredLine.Item[1].Id||''''||') LIMIT 1';
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = _objectURI;
+			
+			PROPAGATE TO TERMINAL 'out2' DELETE NONE;
+			
+			-- make sure the is nothing in the OutputRoot for Propagation
+			   SET OutputRoot.JSON.Data = null;
+			
+			-- Loop through Header Object and Filter matching project_phase_cd
+			SET OutputLocalEnvironment.Variables.project_phase_cd.Item[] =
+			(SELECT I FROM Environment.Variables.Data.Header.caseHeaderBO.chPhaseBOList."Item"[] AS I
+			WHERE TRIM(I.projectPhaseCd) = TRIM(source.project_phase_cd)
+			);
+
+			SET diffInDays = (OutputLocalEnvironment.Variables.project_phase_cd.Item.phaseEndDt - OutputLocalEnvironment.Variables.project_phase_cd.Item.phaseStartDt) / (1000 * 60 * 60 * 24);
+			SET DurationInMonths = ROUND(diffInDays/30.44,2);
+			-- SET Environment.Variables.diffInDays = diffInDays;
+			-- SET Environment.Variables.DurationInMonths = DurationInMonths;
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_Cost_Value_Override__' VALUE CAST(source.total_cost_amt * CAST(Environment.Variables.Data.Header.caseHeaderBO.gpeExchRt AS DECIMAL)/DurationInMonths AS DECIMAL(18,5));
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_GPE_Component_Type_Cd__c' VALUE source.component_type_cd;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_GPE_Employee_Type_Cd__c' VALUE source.employee_type_cd;
+			IF TRIM(source.gpe_group_nm) <> '' THEN
+				CREATE LASTCHILD OF outref.Data
+				NAME 'APTS_GPE_Group_Name__c' VALUE source.gpe_group_nm;
+			END IF;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_GPE_TVM__c' VALUE (CAST(source.tvm_amt AS DECIMAL) * CAST(Environment.Variables.Data.Header.caseHeaderBO.gpeExchRt AS DECIMAL))/DurationInMonths;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_Integration_Type__c' VALUE 'GPE Extract';
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'APTS_Revenue_Apportionment__c' VALUE ROUND(Environment.Variables.Data.Header.caseHeaderBO.totalIeGpPct - Environment.Variables.Data.Header.caseHeaderBO.totalIenomPtiPct, 2)* 100;
+
+			IF source.project_phase_cd = 1 THEN
+				CREATE LASTCHILD OF outref.Data
+				NAME 'APTS_Service_Delivery_Phase_Pick__c' VALUE 'Transition';
+			ELSEIF source.project_phase_cd = 2 THEN
+				CREATE LASTCHILD OF outref.Data
+				NAME 'APTS_Service_Delivery_Phase_Pick__c' VALUE 'Transformation';
+			ELSEIF source.project_phase_cd = 3 THEN
+				CREATE LASTCHILD OF outref.Data
+				NAME 'APTS_Service_Delivery_Phase_Pick__c' VALUE 'Steady State';
+			END IF;
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__AdjustmentAmount__c' VALUE (source.tcv_amt * CAST(Environment.Variables.Data.Header.caseHeaderBO.gpeExchRt AS DECIMAL))/DurationInMonths;
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__AdjustmentType__c' VALUE 'Base Price Override';
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__Comments__c' VALUE source.casecomp_desc_txt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__ConfigStatus__c' VALUE 'Pending';
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__ConfigurationId__c' VALUE Environment.Variables.queryParams.productConfigId;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__ConstraintCheckStatus__c' VALUE 'Pending';
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__EndDate__c' VALUE OutputLocalEnvironment.Variables.project_phase_cd.Item.phaseEndDt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__IsPrimaryLine__c' VALUE 'true';
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__ItemSequence__c' VALUE '1';
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__PricingStatus__c' VALUE 'Pending';
+
+			IF i = 1 THEN
+				IF CAST(Environment.Variables.Data.ProductConfig.Item.APTS_Max_Line_Number__c AS INT) <> '' THEN
+					CREATE LASTCHILD OF outref.Data
+					NAME 'Apttus_Config2__PrimaryLineNumber__c' VALUE CAST(Environment.Variables.Data.ProductConfig.Item.APTS_Max_Line_Number__c AS INT) + 1;
+					SET APTS_Max_Line_Number__c = CAST(Environment.Variables.Data.ProductConfig.Item.APTS_Max_Line_Number__c AS INT) + 1;
+					CREATE LASTCHILD OF outref.Data
+					NAME 'Apttus_Config2__LineNumber__c' VALUE CAST(Environment.Variables.Data.ProductConfig.Item.APTS_Max_Line_Number__c AS INT) + 1;
+				ELSE
+					CREATE LASTCHILD OF outref.Data
+					NAME 'Apttus_Config2__PrimaryLineNumber__c' VALUE 1;
+					SET APTS_Max_Line_Number__c = 1;
+					CREATE LASTCHILD OF outref.Data
+					NAME 'Apttus_Config2__LineNumber__c' VALUE 1;
+				END IF;
+
+			ELSE
+				CREATE LASTCHILD OF outref.Data
+				NAME 'Apttus_Config2__PrimaryLineNumber__c' VALUE APTS_Max_Line_Number__c;
+				CREATE LASTCHILD OF outref.Data
+				NAME 'Apttus_Config2__LineNumber__c' VALUE APTS_Max_Line_Number__c;
+			END IF;
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__PriceListId__c' VALUE Environment.Variables.queryParams.priceListId;
+
+			IF TRIM(Environment.Variables.Data.PriceListItem.records.Item[1].Id) <> '' THEN
+				CREATE LASTCHILD OF outref.Data
+				NAME 'Apttus_Config2__PriceListItemId__c' VALUE Environment.Variables.Data.PriceListItem.records.Item[1].Id;
+			END IF;
+
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__ProductId__c' VALUE OutputLocalEnvironment.Variables.FilteredLine.Item[1].Id;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__Quantity__c' VALUE CAST(source.product_qty_num AS DECIMAL);
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__SellingFrequency__c' VALUE 'Monthly';
+			CREATE LASTCHILD OF outref.Data
+			NAME 'Apttus_Config2__StartDate__c' VALUE OutputLocalEnvironment.Variables.project_phase_cd.Item.phaseStartDt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'CurrencyIsoCode' VALUE Environment.Variables.Data.ProductConfig.Item.CurrencyIsoCode;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_GPE_Inflated_Cost_Amount__c' VALUE source.inflatedcost_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_GPE_Project_Contingency_Amount__c' VALUE CAST(source.project_cntncy_amt AS DECIMAL);
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_GPE_Rsv_Contingency_Amt__c' VALUE CAST(source.reserve_cntncy_amt AS DECIMAL);
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_GPE_TOTAL_HOURS_AMT__c' VALUE source.total_hours_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_GPE_Total_Cost_Amount__c' VALUE source.total_cost_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_GP_PCT__c' VALUE source.npv_gp_pct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_GP__c' VALUE source.npv_gp_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_Netting__c' VALUE source.grossnet_indc;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_PTI_PCT__c' VALUE source.npv_pti_pct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_Total_BMCNMNL_GP_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalBmcnmnlGpPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_Total_IE_GP_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIeGpPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_NPV_Total_PLNOM_GP_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalPlnomGpPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_Nominal_GP_npv__c' VALUE source.gp_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_PC_New_NPV_Cost_Local__c' VALUE source.npv_cost;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_PC_New_NPV_PTI__c' VALUE source.npv_pti_amt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_PC_New_NPV_Price_Local__c' VALUE source.npv_price;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_Payterm_days_num__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.payTermsDaysNum;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_RApct_as_is__c' VALUE source.ra_pct_cc;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_BMCNMNL_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalBmcnmnlPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_IBMIENPV_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIbmienpvPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_IBMIE_PTI_AMT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIbmiePtiAmt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_IENOM_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIenomPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_IENPV_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIenpvPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_PLNOM_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalPlnomPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_TOTAL_PLNPV_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalPlnpvPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_Total_IE_PTI_AMT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.totalIePtiAmt;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_YR1_BMCNMNL_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.yr1BmcnmnlPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_YR1_IENOM_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.yr1IenomPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'IBM_YR1_PLNOM_PTI_PCT__c' VALUE Environment.Variables.Data.Header.caseHeaderBO.yr1PlnomPtiPct;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_BCC_CD__c' VALUE source.bcc_cd;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_BandCd__c' VALUE source.band_cd;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_hourlyDailyIndc__c' VALUE source.hourlydaily_indc;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_performCtryCd__c' VALUE source.perform_ctry_cd;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_siteCountryNm__c' VALUE source.site_country_nm;
+			CREATE LASTCHILD OF outref.Data
+			NAME 'SWS_svcOfferingCd__c' VALUE source.svc_offering_cd;
+			
+			--  Setting HTTP params dynamically
+			SET _objectURI = _instanceURL || '/services/data/v54.0/sobjects/Apttus_Config2__LineItem__c';
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = _objectURI;
+
+			PROPAGATE TO TERMINAL 'out1' DELETE NONE;
+
+			SET APTS_Max_Line_Number__c = APTS_Max_Line_Number__c + 1;
+			SET i = i + 1;
+
+
+		END FOR;
+		-- make sure the is nothing in the OutputRoot for Propagation
+		SET OutputRoot.JSON.Data = null;
+		SET OutputRoot.JSON.Data.CaseUId = Environment.Variables.queryParams.caseUId;
+		SET OutputRoot.JSON.Data.CaseExtractStatus='Success';
+		SET OutputRoot.JSON.Data.CaseExtractMessage='SDM GPE Lines Updated in Conga';
+
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
